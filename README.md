@@ -25,3 +25,8 @@ If a song is currently playing, it will write the following fields:
 e.g. `playing|20|So Was Red|Thomas Newman|The Shawshank Redemption|2:46|/path/to/music/Thomas Newman/The Shawshank Redemption/20 So Was Red.mp3|/tmp/clementine-art-l10931.jpg`
 
 (MIT License)
+
+P.S. If you are unfamiliar with [Clementine](http://www.clementine-player.org/)
+you can read a [little review I
+wrote](http://www.michevan.id.au/content/clementine) detailing why I think it
+is the best desktop music player around.
