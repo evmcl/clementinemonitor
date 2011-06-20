@@ -1,0 +1,123 @@
+#!/usr/bin/python
+
+###############################################################################
+#
+# By Evan McLean http://evanmclean.com/ and http://www.michevan.id.au/
+#
+# Monitors what is currently playing in your Clementine music player, by
+# hooking into the relevant dbus signals to detect state change.
+#
+# Writes song info in a format easily digested by a shell script or other
+# program.
+#
+###############################################################################
+#
+# MIT License
+#
+# Copyright (c) 2011 Evan McLean
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# Except as contained in this notice, the name(s) of the above copyright
+# holders shall not be used in advertising or otherwise to promote the sale,
+# use or other dealings in this Software without prior written authorisation.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+###############################################################################
+
+import dbus
+import dbus.mainloop.glib
+import glib
+import sys
+import os
+
+prevout = ""
+
+def printifchanged( out ):
+  '''Write string to stdout if it is different from the last thing we wrote.
+  Will exit if we detect a broken pipe. NOTE: Need to use os._exit as the
+  exception normally thrown by sys.exit gets swallowed and ignored by the
+  callback handler.
+  '''
+  global prevout
+  if out != prevout:
+    try:
+      print out
+      sys.stdout.flush()
+      prevout = out
+    except IOError:
+      os._exit(1);
+
+def metatostr( meta ):
+  '''Converts the metadata read from the player into a single pipe delimited string.'''
+  # Format time in total seconds to m:ss formatted string.
+  totsecs = meta["time"]
+  secs = totsecs % 60
+  mins = str(totsecs / 60)
+  if ( secs < 10 ):
+    secs = "0" + str(secs)
+  else:
+    secs = str(secs)
+  tottime = mins + ':' + secs
+
+  # Get the artwork URL, and strip off leading 
+  arturl = meta["arturl"]
+  if arturl.startswith("file://"):
+    arturl = arturl[7:]
+
+  return str(meta["tracknumber"]) + '|' + meta["title"] + '|' + meta["artist"] + '|' + meta["album"] + '|' + tottime + '|' + meta["location"] + '|' + arturl
+
+def printcurrent():
+  '''Get the current status and song data from the player and print it.'''
+  global iface
+  status = iface.GetStatus()[0]
+  if status == 2:
+    printifchanged("stopped")
+  else:
+    meta = iface.GetMetadata()
+    if status == 0:
+      printifchanged("playing|" + metatostr(meta))
+    elif status == 1:
+      printifchanged("paused|" + metatostr(meta))
+
+def trackchanged(data):
+  '''Callback handler for a TrackChange event.'''
+  printcurrent()
+
+def statuschanged(data):
+  '''Callback handler for a StatusChange event.'''
+  printcurrent()
+
+# Main
+dbus.mainloop.glib.DBusGMainLoop(set_as_default = True)
+
+session_bus = dbus.SessionBus()
+
+player = session_bus.get_object('org.mpris.clementine', '/Player')
+iface = dbus.Interface(player, dbus_interface='org.freedesktop.MediaPlayer')
+iface.connect_to_signal("TrackChange", trackchanged)
+iface.connect_to_signal("StatusChange", statuschanged)
+
+# Print the initial status before we enter the loop.
+printcurrent()
+
+mainloop = glib.MainLoop()
+try:
+  mainloop.run()
+except KeyboardInterrupt:
+  sys.exit(1); # Exit cleanly on a ctrl-c.

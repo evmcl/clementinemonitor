@@ -1,0 +1,64 @@
+#!/bin/sh
+
+# Example script that uses clementinemonitor to produce output for conky.
+#
+# Copyright (c) 2011 Evan McLean (MIT License)
+
+CONKY_DATA_FINAL=~/.conky/music.txt
+CONKY_DATA="${CONKY_DATA_FINAL}.working"
+
+EMPTYARTFILE=~/path/to/no_album.png
+ARTFILE_BASE=/tmp/conky_album_art.$$.
+
+# Exit trap that writes out a "Not Monitoring" message for conky,
+# and removes all the artwork files we generated.
+on_exit()
+{
+  echo "\${goto 150}\${color1}Not Monitoring" > $CONKY_DATA
+  mv $CONKY_DATA $CONKY_DATA_FINAL
+  rm ${ARTFILE_BASE}*.png 2> /dev/null
+}
+
+trap on_exit EXIT
+
+IFS="|"
+clementinemonitor | while read STATUS TRACKNUM TITLE ARTIST ALBUM TOTALTIME FILE ART CRUFT
+do
+
+  if [ "a$ART" != "a" -a -f "$ART" ]
+  then
+    # Get the checksum for the file. We will use this as part of our temporary
+    # file name for the resized file. That way, we only end up converting each
+    # unique cover file once.
+    SHASUM="$(sha1sum "$ART" | sed -e 's/ .*$//')"
+    ARTFILE="${ARTFILE_BASE}${SHASUM}.png"
+    if [ ! -e "$ARTFILE" ]
+    then
+      convert "$ART" -resize "130x130" "$ARTFILE"
+    fi
+  else
+    ARTFILE="$EMPTYARTFILE"
+  fi
+
+  if [ "$STATUS" = "stopped" ]
+  then
+    echo "\${goto 150}\${color1}Not Active" > $CONKY_DATA
+  else
+    if [ "$STATUS" = "playing" ]
+    then
+      COLOUR="color2"
+    else
+      COLOUR="color3"
+    fi
+    echo "\${goto 150}\${color1}Title\${goto 195}\${$COLOUR}$TITLE" > $CONKY_DATA
+    echo "\${goto 150}\${color1}Artist\${goto 195}\${$COLOUR}$ARTIST" >> $CONKY_DATA
+    echo "\${goto 150}\${color1}Album\${goto 195}\${$COLOUR}$ALBUM" >> $CONKY_DATA
+    echo "\${goto 150}\${color1}Track\${goto 195}\${$COLOUR}$TRACKNUM" >> $CONKY_DATA
+    echo "\${goto 150}\${color1}Length\${goto 195}\${$COLOUR}$TOTALTIME" >> $CONKY_DATA
+    echo "\${image $ARTFILE}" >> $CONKY_DATA
+  fi
+
+  # Write to a temporary file, then move into place so conky doesn't end up
+  # reading a half-written file.
+  mv $CONKY_DATA $CONKY_DATA_FINAL
+done
