@@ -1,3 +1,7 @@
+# Clementine Monitor
+
+[https://github.com/evmcl/clementinemonitor](https://github.com/evmcl/clementinemonitor)
+
 Monitors what is currently playing in your
 [Clementine](http://www.clementine-player.org/) music player, by hooking into
 the relevant dbus signals to detect state change.
