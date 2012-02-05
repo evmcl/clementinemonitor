@@ -42,9 +42,11 @@
 
 import dbus
 import dbus.mainloop.glib
-import glib
+#import glib
+import gobject
 import sys
 import os
+import math
 
 prevout = ""
 
@@ -57,7 +59,8 @@ def printifchanged( out ):
   global prevout
   if out != prevout:
     try:
-      print out
+#      print(out.encode('utf-8'))
+      print(out)
       sys.stdout.flush()
       prevout = out
     except IOError:
@@ -68,7 +71,7 @@ def metatostr( meta ):
   # Format time in total seconds to m:ss formatted string.
   totsecs = meta["time"]
   secs = totsecs % 60
-  mins = str(totsecs / 60)
+  mins = str(math.floor(totsecs / 60))
   if ( secs < 10 ):
     secs = "0" + str(secs)
   else:
@@ -116,7 +119,8 @@ iface.connect_to_signal("StatusChange", statuschanged)
 # Print the initial status before we enter the loop.
 printcurrent()
 
-mainloop = glib.MainLoop()
+#mainloop = glib.MainLoop()
+mainloop = gobject.MainLoop()
 try:
   mainloop.run()
 except KeyboardInterrupt:
