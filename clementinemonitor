@@ -59,8 +59,8 @@ def printifchanged( out ):
   global prevout
   if out != prevout:
     try:
-#      print(out.encode('utf-8'))
-      print(out)
+      sys.stdout.buffer.write(out.encode('utf-8'))
+      sys.stdout.buffer.write("\n".encode('utf-8'))
       sys.stdout.flush()
       prevout = out
     except IOError:
@@ -69,7 +69,7 @@ def printifchanged( out ):
 def metatostr( meta ):
   '''Converts the metadata read from the player into a single pipe delimited string.'''
   # Format time in total seconds to m:ss formatted string.
-  totsecs = meta["time"]
+  totsecs = meta["mpris:length"] / 1000000
   secs = totsecs % 60
   mins = str(math.floor(totsecs / 60))
   if ( secs < 10 ):
@@ -79,31 +79,32 @@ def metatostr( meta ):
   tottime = mins + ':' + secs
 
   # Get the artwork URL, and strip off leading 
-  arturl = meta["arturl"]
+  arturl = meta["mpris:artUrl"]
   if arturl.startswith("file://"):
     arturl = arturl[7:]
 
-  return str(meta["tracknumber"]) + '|' + meta["title"] + '|' + meta["artist"] + '|' + meta["album"] + '|' + tottime + '|' + meta["location"] + '|' + arturl
+  # Get location URL, and strip off leading
+  location = meta["xesam:url"];
+  if location.startswith("file://"):
+    location = location[7:]
+
+  return str(meta["xesam:trackNumber"]) + '|' + meta["xesam:title"] + '|' + meta["xesam:artist"][0] + '|' + meta["xesam:album"] + '|' + tottime + '|' + location + '|' + arturl
 
 def printcurrent():
   '''Get the current status and song data from the player and print it.'''
-  global iface
-  status = iface.GetStatus()[0]
-  if status == 2:
+  global props_iface
+  status = props_iface.Get('org.mpris.MediaPlayer2.Player', 'PlaybackStatus');
+  if status == 'Stopped':
     printifchanged("stopped")
   else:
-    meta = iface.GetMetadata()
-    if status == 0:
+    meta = props_iface.Get('org.mpris.MediaPlayer2.Player', 'Metadata');
+    if status == 'Playing':
       printifchanged("playing|" + metatostr(meta))
-    elif status == 1:
+    elif status == 'Paused':
       printifchanged("paused|" + metatostr(meta))
 
-def trackchanged(data):
-  '''Callback handler for a TrackChange event.'''
-  printcurrent()
-
-def statuschanged(data):
-  '''Callback handler for a StatusChange event.'''
+def propschanged(arg1, arg2, arg3):
+  '''Callback handler for a PropertiesChanged event.'''
   printcurrent()
 
 # Main
@@ -111,10 +112,9 @@ dbus.mainloop.glib.DBusGMainLoop(set_as_default = True)
 
 session_bus = dbus.SessionBus()
 
-player = session_bus.get_object('org.mpris.clementine', '/Player')
-iface = dbus.Interface(player, dbus_interface='org.freedesktop.MediaPlayer')
-iface.connect_to_signal("TrackChange", trackchanged)
-iface.connect_to_signal("StatusChange", statuschanged)
+player = session_bus.get_object('org.mpris.MediaPlayer2.clementine', '/org/mpris/MediaPlayer2')
+props_iface = dbus.Interface(player, 'org.freedesktop.DBus.Properties');
+props_iface.connect_to_signal("PropertiesChanged", propschanged)
 
 # Print the initial status before we enter the loop.
 printcurrent()
