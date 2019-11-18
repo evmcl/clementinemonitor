@@ -42,8 +42,8 @@
 
 import dbus
 import dbus.mainloop.glib
-#import glib
-import gobject
+import gi
+from gi.repository import GLib
 import sys
 import os
 import math
@@ -119,8 +119,7 @@ props_iface.connect_to_signal("PropertiesChanged", propschanged)
 # Print the initial status before we enter the loop.
 printcurrent()
 
-#mainloop = glib.MainLoop()
-mainloop = gobject.MainLoop()
+mainloop = GLib.MainLoop()
 try:
   mainloop.run()
 except KeyboardInterrupt:
